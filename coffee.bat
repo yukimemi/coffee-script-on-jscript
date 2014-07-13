@@ -7,7 +7,7 @@
 
 var FSO = WScript.CreateObject("Scripting.FileSystemObject");
 
-function Watcher() {
+function Watcher() {//{{{
   this.paths = {};
   this.origin = {};
 }
@@ -46,7 +46,7 @@ Watcher.prototype.watch = function() {
           this.onModified(this.origin[path]);
         }
       } else {
-        delete this.paths[path];
+        // delete this.paths[path];
         this.onRemoved(path);
       }
     }
@@ -54,9 +54,9 @@ Watcher.prototype.watch = function() {
   }
 };
 Watcher.prototype.onModified = function(path, renewed) {};
-Watcher.prototype.onRemoved = function(path) {};
+Watcher.prototype.onRemoved = function(path) {};//}}}
 
-function childPaths(path) {
+function childPaths(path) {//{{{
   var childlen = {};
   if (FSO.FolderExists(path)) {
     var folder = FSO.GetFolder(path);
@@ -68,14 +68,14 @@ function childPaths(path) {
     }
   }
   return childlen;
-}
+}//}}}
 
-function loadCoffee() {
+function loadCoffee() {//{{{
   eval(readFile(FSO.BuildPath(FSO.GetParentFolderName(WScript.ScriptFullName), "coffee-script.js")));
   return this.CoffeeScript;
-}
+}//}}}
 
-var readFile = (function() {
+var readFile = (function() {//{{{
   // some characters are broken in 'iso-8859-1'.
   var illegalChars = {
     0x20ac: 0x80, 0x81  : 0x81, 0x201a: 0x82, 0x192 : 0x83, 0x201e: 0x84,
@@ -111,31 +111,35 @@ var readFile = (function() {
       stream.Close();
     }
   }
-})();
+})();//}}}
 
-function writeFile(file, content) {
+function writeFile(file, content, charset) {//{{{
   var stream = WScript.CreateObject('ADODB.Stream');
   try {
-    stream.Charset = 'iso-8859-1';
+    stream.Charset = charset || 'iso-8859-1';
     stream.Open();
     stream.WriteText(content);
     stream.SaveToFile(file, 2);
   } finally {
     stream.Close();
   }
-}
+}//}}}
 
-function binaryToString(binary, charset) {
+function binaryToString(binary, charset) {//{{{
   var stream = WScript.CreateObject('ADODB.Stream');
-  stream.Charset = 'iso-8859-1';
-  stream.Open();
-  stream.WriteText(binary);
-  stream.Position = 0;
-  stream.Charset = charset || '_autodetect_all';
-  return stream.ReadText();
-}
+  try {
+    stream.Charset = 'iso-8859-1';
+    stream.Open();
+    stream.WriteText(binary);
+    stream.Position = 0;
+    stream.Charset = charset || '_autodetect_all';
+    return stream.ReadText();
+  } finally {
+    stream.Close();
+  }
+}//}}}
 
-function parseArguments() {
+function parseArguments() {//{{{
   var args = getArgs();
   var res = {
     args: [],
@@ -239,17 +243,17 @@ function parseArguments() {
     o.print = true;
   }
   return res;
-}
+}//}}}
 
-function getArgs() {
+function getArgs() {//{{{
   var args = [];
   for (var i = 0; i < WScript.Arguments.length; i++) {
     args.push(WScript.Arguments(i));
   }
   return args;
-}
+}//}}}
 
-function tokensToString(tokens) {
+function tokensToString(tokens) {//{{{
   var strings = [];
   for (var i = 0; i < tokens.length; i++) {
     var token = tokens[i];
@@ -258,18 +262,25 @@ function tokensToString(tokens) {
     strings.push("[" + token[0] + " " + value + "]");
   }
   return strings.join(' ');
-};
+};//}}}
 
-function createFolders(folder) {
+function createFolders(folder) {//{{{
   folder = FSO.GetAbsolutePathName(folder);
   if (!FSO.FolderExists(folder)) {
     var parent = FSO.GetParentFolderName(folder);
     createFolders(parent);
     FSO.CreateFolder(folder);
   }
-}
+}//}}}
 
-function usage() {
+function addHeader(file) {//{{{
+  var content = binaryToString(readFile(file), "UTF-8");
+  var header = "@set @junk=1 /* vim:set ft=javascript:\n@cscript //nologo //e:jscript \"%~f0\" %*\n@goto :eof\n*/\n\n";
+  var cmd = file.replace(/(\.\w+)?$/, ".cmd");
+  writeFile(cmd, (header + content).split("\n").join("\r\n"), "Shift_JIS");
+}//}}}
+
+function usage() {//{{{
   WScript.Echo('');
   WScript.Echo("Usage: coffee [options] path/to/script.coffee");
   WScript.Echo('');
@@ -288,9 +299,9 @@ function usage() {
   WScript.Echo("  -w, --watch        watch scripts for changes, and recompile");
 
   WScript.Quit(0);
-}
+}//}}}
 
-function main() {
+function main() {//{{{
   var args = parseArguments();
   var o = args.options;
 
@@ -337,6 +348,7 @@ function main() {
         }
         createFolders(FSO.GetParentFolderName(js));
         writeFile(js, compiled);
+        addHeader(js);
       }
     } else {
       CoffeeScript.run(binaryToString(src, o.encoding), compileOptions);
@@ -433,13 +445,13 @@ function main() {
     o.join = false;
     processCode(contents.join("\n"), file);
   }
-}
+}//}}}
 
-try {
+try {//{{{
   main();
 } catch (e) {
   WScript.StdErr.WriteLine("Error: " + e.message);
   WScript.Quit(1);
-}
+}//}}}
 
 }).call(this);
