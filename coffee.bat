@@ -1,4 +1,4 @@
-@set @junk=1 /* vim:set ft=javascript:
+@set @junk=1 /* vim:set ft=javascript fenc=cp932 ff=dos:
 @cscript //nologo //e:jscript "%~dpn0.bat" %*
 @goto :eof
 */
@@ -156,7 +156,8 @@ function parseArguments() {//{{{
       stdio: false,
       tokens: false,
       version: false,
-      watch: false
+      watch: false,
+      runcmd: false
     }
   };
   var o = res.options;
@@ -212,6 +213,10 @@ function parseArguments() {//{{{
       case "-w":
       case "--watch":
         o.watch = true;
+      break;
+      case "-r":
+      case "--runcmd":
+        o.runcmd = true;
       break;
       default:
         throw new Error("unrecognized option: " + opt);
@@ -275,9 +280,22 @@ function createFolders(folder) {//{{{
 
 function addHeader(file) {//{{{
   var content = binaryToString(readFile(file), "UTF-8");
-  var header = "@set @junk=1 /* vim:set ft=javascript:\n@cscript //nologo //e:jscript \"%~f0\" %*\n@goto :eof\n*/\n\n";
+  var header = "@set @junk=1 /* vim:set ft=javascript:\n@cscript //nologo //e:jscript \"%~f0\" %*\n@exit /b %errorlevel%\n*/\n\n";
   var cmd = file.replace(/(\.\w+)?$/, ".cmd");
   writeFile(cmd, (header + content).split("\n").join("\r\n"), "Shift_JIS");
+}//}}}
+
+function runCmd(js) {//{{{
+  var sh = WScript.CreateObject("WScript.Shell");
+  var cmd = js.replace(/(\.\w+)?$/, ".cmd");
+  var exec = sh.Exec(cmd);
+  while (exec.Status !== 0) {
+    WScript.Sleep(1);
+  }
+  var out = exec.StdOut.ReadAll() + exec.StdErr.ReadAll();
+  WScript.StdOut.WriteLine(out);
+  WScript.Echo("ExitCode = [" + exec.ExitCode + "]");
+  return exec.ExitCode;
 }//}}}
 
 function usage() {//{{{
@@ -297,6 +315,7 @@ function usage() {//{{{
   WScript.Echo("  -t, --tokens       print the tokens that the lexer produces");
   WScript.Echo("  -v, --version      display CoffeeScript version");
   WScript.Echo("  -w, --watch        watch scripts for changes, and recompile");
+  WScript.Echo("  -r, --runcmd       run the compiled scripts as JScript");
 
   WScript.Quit(0);
 }//}}}
@@ -318,11 +337,11 @@ function main() {//{{{
 
   var contents = [];
 
-  function print(str) {
+  function print(str) {//{{{
     WScript.StdOut.Write(binaryToString(str, o.encoding));
-  }
+  }//}}}
 
-  function processCode(src, file, base) {
+  function processCode(src, file, base) {//{{{
     var compileOptions = {
       filename: file,
       bare: o.bare
@@ -333,7 +352,7 @@ function main() {//{{{
       print(tokensToString(CoffeeScript.tokens(src)));
     } else if (o.nodes) {
       print(CoffeeScript.nodes(src).toString().replace(/^\s+|\s+$/g, ""));
-    } else if (o.compile) {
+    } else if (o.compile || o.runcmd) {
       var compiled = CoffeeScript.compile(src, compileOptions);
       if (o.print) {
         print(compiled);
@@ -349,23 +368,26 @@ function main() {//{{{
         createFolders(FSO.GetParentFolderName(js));
         writeFile(js, compiled);
         addHeader(js);
+        if (o.runcmd) {
+          runCmd(js);
+        }
       }
     } else {
       CoffeeScript.run(binaryToString(src, o.encoding), compileOptions);
     }
-  }
+  }//}}}
 
-  function process(path, base) {
+  function process(path, base) {//{{{
     if (FSO.FileExists(path)) {
       processCode(readFile(path), path, base);
     }
-  }
+  }//}}}
 
-  function isCoffee(file) {
+  function isCoffee(file) {//{{{
     return FSO.GetExtensionName(file) === "coffee";
-  }
+  }//}}}
 
-  function traverse(path, func, base) {
+  function traverse(path, func, base) {//{{{
     if (FSO.FolderExists(path)) {
       var folder = FSO.GetFolder(path);
       if (!base) {
@@ -384,9 +406,9 @@ function main() {//{{{
       throw new Error("File not found: " + path);
     }
     func(path, base);
-  }
+  }//}}}
 
-  var watcher, addWatcher;
+  var watcher, addWatcher;//{{{
   if (o.watch) {
     watcher = new Watcher();
 
@@ -425,7 +447,7 @@ function main() {//{{{
         watcher.add(path);
       };
     })(watcher);
-  }
+  }//}}}
 
   for (var i = 0; i < args.args.length; i++) {
     var arg = args.args[i];
