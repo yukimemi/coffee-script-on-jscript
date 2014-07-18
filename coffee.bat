@@ -280,7 +280,7 @@ function createFolders(folder) {//{{{
 
 function addHeader(file) {//{{{
   var content = binaryToString(readFile(file), "UTF-8");
-  var header = "@set @junk=1 /* vim:set ft=javascript:\n@cscript //nologo //e:jscript \"%~f0\" %*\n@exit /b %errorlevel%\n*/\n\n";
+  var header = "@set @junk=1 /* vim:set ft=javascript:\n@cscript //nologo //e:jscript \"%~f0\" %*\npause\n@exit /b %errorlevel%\n*/\n\n";
   var cmd = file.replace(/(\.\w+)?$/, ".cmd");
   writeFile(cmd, (header + content).split("\n").join("\r\n"), "Shift_JIS");
 }//}}}
@@ -288,12 +288,10 @@ function addHeader(file) {//{{{
 function runCmd(js) {//{{{
   var sh = WScript.CreateObject("WScript.Shell");
   var cmd = js.replace(/(\.\w+)?$/, ".cmd");
+  WScript.Echo("Execute: " + cmd);
   var exec = sh.Exec(cmd);
-  while (exec.Status !== 0) {
-    WScript.Sleep(1);
-  }
-  var out = exec.StdOut.ReadAll() + exec.StdErr.ReadAll();
-  WScript.StdOut.WriteLine(out);
+  WScript.StdOut.WriteLine(exec.StdOut.ReadLine());
+  WScript.StdErr.WriteLine(exec.StdErr.ReadLine());
   WScript.Echo("ExitCode = [" + exec.ExitCode + "]");
   return exec.ExitCode;
 }//}}}
